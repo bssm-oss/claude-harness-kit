@@ -1,0 +1,7 @@
+{
+  "name": "fe-experts",
+  "version": "1.0.0",
+  "description": "Frontend expert pool for React 19 / Next.js 15+ / TypeScript strict",
+  "author": { "name": "justn-hyeok" },
+  "keywords": ["frontend", "react", "nextjs", "tailwind", "jotai"]
+}

@@ -1,25 +1,45 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+REPO_DIR="$(cd "$(dirname "$0")" && pwd)"
 CLAUDE_DIR="$HOME/.claude"
 
-dirs=(agents skills harnesses)
+removed=0
 
-for dir in "${dirs[@]}"; do
-  target="$CLAUDE_DIR/$dir"
+# Remove agents from all plugins
+for f in "$REPO_DIR"/plugins/*/agents/*.md; do
+  [ -f "$f" ] || continue
+  dest="$CLAUDE_DIR/agents/$(basename "$f")"
+  if [ -f "$dest" ]; then
+    rm "$dest"
+    echo "removed: agents/$(basename "$f")"
+    ((removed++))
+  fi
+done
 
-  if [ -L "$target" ]; then
-    rm "$target"
-    echo "removed symlink: $target"
+# Remove skills
+for d in "$REPO_DIR"/plugins/*/skills/*/; do
+  [ -d "$d" ] || continue
+  name="$(basename "$d")"
+  dest="$CLAUDE_DIR/skills/${name}.md"
+  if [ -f "$dest" ]; then
+    rm "$dest"
+    echo "removed: skills/${name}.md"
+    ((removed++))
+  fi
+done
 
-    if [ -d "${target}.bak" ]; then
-      mv "${target}.bak" "$target"
-      echo "restored backup: ${target}.bak -> $target"
-    fi
-  else
-    echo "skipped (not a symlink): $target"
+# Remove harness docs
+for f in "$REPO_DIR"/plugins/*/*.md; do
+  [ -f "$f" ] || continue
+  name="$(basename "$f")"
+  dest="$CLAUDE_DIR/harnesses/$name"
+  if [ -f "$dest" ]; then
+    rm "$dest"
+    echo "removed: harnesses/$name"
+    ((removed++))
   fi
 done
 
 echo ""
-echo "uninstalled."
+echo "done. removed: $removed files."

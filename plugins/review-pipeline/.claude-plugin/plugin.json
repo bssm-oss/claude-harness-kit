@@ -1,0 +1,7 @@
+{
+  "name": "review-pipeline",
+  "version": "1.0.0",
+  "description": "Multi-stage code review with fan-out/fan-in pattern and SARIF output",
+  "author": { "name": "justn-hyeok" },
+  "keywords": ["review", "audit", "sarif"]
+}

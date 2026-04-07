@@ -1,0 +1,7 @@
+{
+  "name": "dev-pipeline",
+  "version": "1.0.0",
+  "description": "Full feature development pipeline: planner -> FE+BE parallel -> reviewer -> QA",
+  "author": { "name": "justn-hyeok" },
+  "keywords": ["dev", "pipeline", "feature"]
+}

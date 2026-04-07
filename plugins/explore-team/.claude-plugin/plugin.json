@@ -1,0 +1,7 @@
+{
+  "name": "explore-team",
+  "version": "1.0.0",
+  "description": "Hierarchical codebase exploration with hypothesis-evidence-synthesis flow",
+  "author": { "name": "justn-hyeok" },
+  "keywords": ["explore", "investigate", "architecture", "analysis"]
+}

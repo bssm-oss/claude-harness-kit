@@ -1,0 +1,26 @@
+{
+  "name": "claude-code-harness",
+  "version": "1.0.0",
+  "description": "Multi-agent harness for Claude Code: dev pipeline, code review, frontend/backend experts, codebase exploration",
+  "type": "module",
+  "bin": {
+    "claude-code-harness": "bin/install.mjs"
+  },
+  "files": [
+    "bin/",
+    "plugins/"
+  ],
+  "keywords": [
+    "claude-code",
+    "harness",
+    "agents",
+    "multi-agent",
+    "code-review",
+    "pipeline"
+  ],
+  "author": "justn-hyeok",
+  "license": "MIT",
+  "engines": {
+    "node": ">=18"
+  }
+}

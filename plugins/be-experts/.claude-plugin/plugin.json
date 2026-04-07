@@ -1,0 +1,7 @@
+{
+  "name": "be-experts",
+  "version": "1.0.0",
+  "description": "Backend expert pool for Hono/Express with LLM multi-provider support",
+  "author": { "name": "justn-hyeok" },
+  "keywords": ["backend", "api", "hono", "express", "llm", "zod"]
+}
