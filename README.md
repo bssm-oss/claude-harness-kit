@@ -1,4 +1,4 @@
-# claude-harness
+# harness-for-yall
 
 Claude Code multi-agent harness: 25 agents, 15 skills, 5 teams.
 
@@ -35,7 +35,7 @@ npx claude-code-harness --force
 In Claude Code:
 
 ```
-/plugin marketplace add justn-hyeok/claude-harness
+/plugin marketplace add bssm-oss/harness-for-yall
 /plugin install dev-pipeline@justn-harness
 /plugin install review-pipeline@justn-harness
 /plugin install fe-experts@justn-harness
