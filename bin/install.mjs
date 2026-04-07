@@ -64,6 +64,36 @@ function transformForOpenCode(content) {
       );
     }
 
+    // Convert tools array to OpenCode permission record
+    // Claude Code: tools:\n  - Read\n  - Write\n  - Bash
+    // OpenCode: permission:\n  read: allow\n  write: allow\n  bash:\n    "*": allow
+    const toolsMatch = transformed.match(/^tools:\n((?:\s+-\s+\w+\n?)+)/m);
+    if (toolsMatch) {
+      const toolNames = toolsMatch[1]
+        .split('\n')
+        .map((l) => l.replace(/^\s+-\s+/, '').trim().toLowerCase())
+        .filter(Boolean);
+
+      const TOOL_PERMISSION_MAP = {
+        read: 'read: allow',
+        write: 'write: allow',
+        edit: 'edit: allow',
+        glob: 'glob: allow',
+        grep: 'grep: allow',
+        bash: 'bash:\n    "*": allow',
+        notebookedit: 'notebook: allow',
+      };
+
+      const permissionLines = toolNames
+        .map((t) => TOOL_PERMISSION_MAP[t])
+        .filter(Boolean)
+        .map((l) => `  ${l}`)
+        .join('\n');
+
+      const replacement = permissionLines ? `permission:\n${permissionLines}` : '';
+      transformed = transformed.replace(/^tools:\n(?:\s+-\s+\w+\n?)+/m, replacement);
+    }
+
     return transformed;
   }
 
