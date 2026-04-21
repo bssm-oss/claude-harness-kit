@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.1.2] - 2026-04-22
+
+### Added
+- `/review-codebase` skill: full codebase review with 3–10 auto-scaled parallel screeners
+  - Auto-scales by file count: ≤30→3, 31-80→5, 81-150→7, 150+→10
+  - `--screeners N` to override, `--focus area` to hint
+  - Files partitioned by directory; slot-based focus rotation
+- `review-screener-codebase` agent: full-spectrum L1 screener that reads files directly
+
 ## [0.1.1] - 2026-04-22
 
 ### Fixed
