@@ -1,6 +1,6 @@
 ---
 name: explore-synthesizer
-description: "Consolidates exploration findings into actionable architecture reports"
+description: "Use when evidence collection is complete; handles consolidating exploration findings into an actionable architecture report."
 model: sonnet
 ---
 

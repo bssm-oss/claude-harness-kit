@@ -1,23 +1,32 @@
 {
-  "name": "harness-for-yall",
-  "version": "1.4.0",
-  "description": "Multi-agent harness for Claude Code: dev pipeline, code review, frontend/backend experts, codebase exploration",
+  "name": "claude-harness-kit",
+  "version": "0.1.0",
+  "description": "Community harness kit for Claude Code — multi-agent orchestration with 7 patterns, 8 teams, built-in operations tooling",
   "type": "module",
   "bin": {
-    "harness-for-yall": "bin/install.mjs",
-    "harness-for-yall-uninstall": "bin/uninstall.mjs"
+    "claude-harness-kit": "bin/install.mjs"
   },
   "files": [
     "bin/",
-    "plugins/"
+    "plugins/",
+    "scripts/",
+    "core/",
+    "docs/",
+    "examples/",
+    "README.md",
+    "README.ko.md",
+    "CHANGELOG.md",
+    "LICENSE"
   ],
   "keywords": [
     "claude-code",
+    "claude",
     "harness",
-    "agents",
     "multi-agent",
-    "code-review",
-    "pipeline"
+    "orchestration",
+    "ai-agent",
+    "llm",
+    "mcp"
   ],
   "author": "justn-hyeok",
   "license": "MIT",

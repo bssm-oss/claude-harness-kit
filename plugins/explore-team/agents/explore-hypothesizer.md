@@ -1,6 +1,6 @@
 ---
 name: explore-hypothesizer
-description: "Generates competing hypotheses about architecture, behavior, and root causes from exploration data"
+description: "Use when explore-scout needs competing explanations; handles generating multiple hypotheses about architecture, behavior, or root causes from exploration data."
 model: sonnet
 ---
 

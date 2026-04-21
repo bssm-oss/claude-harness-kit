@@ -1,0 +1,7 @@
+{
+  "name": "debate-team",
+  "version": "1.0.0",
+  "description": "Adversarial debate for contested decisions: advocate-a + advocate-b + devils-advocate -> judge",
+  "keywords": ["debate", "tradeoff", "decision", "adversarial", "reasoning"],
+  "category": "reasoning"
+}

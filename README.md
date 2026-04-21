@@ -1,150 +1,112 @@
-# harness-for-yall
+# claude-harness-kit
 
-Multi-agent harness for [Claude Code](https://docs.anthropic.com/en/docs/claude-code): 26 agents, 15 skills, 5 teams.
+[![npm](https://img.shields.io/npm/v/claude-harness-kit)](https://www.npmjs.com/package/claude-harness-kit)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+
+Community harness kit for Claude Code — multi-agent orchestration with 7 patterns and 8 specialist teams.
 
 > **[한국어 문서](./README.ko.md)**
 
-## What is this?
+## Install
 
-A pre-configured set of Claude Code agents organized into 5 specialized teams. Each team uses a different multi-agent orchestration pattern optimized for its purpose.
+```bash
+# One-shot via npx (no global install)
+npx claude-harness-kit
+
+# Or install globally
+npm install -g claude-harness-kit
+claude-harness-kit
+```
+
+After installation, agents and skills are available in `~/.claude/agents/` and `~/.claude/skills/`.
 
 ## Teams
 
-| Plugin | Pattern | Agents | Skills | What it does |
-|--------|---------|:------:|:------:|-------------|
-| `dev-pipeline` | Pipeline | 5 | 1 | Full feature dev: planner → FE+BE parallel → reviewer gate → QA |
-| `review-pipeline` | Fan-out / Fan-in | 5 | 1 | Code review: 3 parallel screeners → moderator → judge (SARIF output) |
-| `fe-experts` | Expert Pool | 5 | 5 | Frontend: architect → implementer / styler → perf + tester |
-| `be-experts` | Pipeline + Expert Pool | 7 | 5 | Backend: architect → impl + validator → resilience / provider / security → tester |
-| `explore-team` | Hierarchical Delegation | 4 | 3 | Codebase exploration: scout(opus) → hypothesizer → evidence → synthesizer |
-| `ops-kit` | Skills + Hook | 0 | 2 | Release pipeline (`/release`) + CI auto-fix (`/ci-watch`) + push hook + CLAUDE.md rules |
+| Team | Pattern | Agents | Skills | Use when |
+|------|---------|:------:|:------:|----------|
+| `dev-team` | Pipeline | 5 | 1 | Building a full feature (FE + BE + review + QA) |
+| `review-team` | Fan-out/Fan-in | 5 | 1 | Auditing existing code or a PR |
+| `fe-team` | Expert Pool + Reflection | 6 | 5 | React, Next.js, Tailwind, a11y, perf |
+| `be-team` | Pipeline + Expert Pool + Reflection | 8 | 5 | Hono/Express API, LLM integration, MCP |
+| `explore-team` | Hierarchical Delegation | 4 | 3 | Investigating codebase, root cause, arch review |
+| `research-team` | Blackboard | 4 | 3 | Web research, library comparison, fact-gathering |
+| `debate-team` | Adversarial Debate | 4 | 2 | Architecture decisions, trade-off analysis |
+| `ops-team` | Skills + Hooks | 0 | 3 | Release, CI watch, orphan process cleanup |
 
-## Install
+## Patterns
 
-### Option 1 — npx
+| # | Pattern | Description |
+|---|---------|-------------|
+| 1 | Pipeline | Sequential stages — each stage's output feeds the next |
+| 2 | Fan-out / Fan-in | Parallel workers, results aggregated by a moderator |
+| 3 | Expert Pool | Route to domain specialist agent |
+| 4 | Hybrid Pipeline + Expert Pool | Sequential stages, each stage is an expert |
+| 5 | Hierarchical Delegation | Scout orchestrates, delegates to specialists |
+| 6 | Adversarial Debate | Advocates argue positions, judge decides (max 5 rounds) |
+| 7 | Blackboard | Shared state file; agents read/write with no explicit handoff |
 
-```bash
-# All plugins
-npx harness-for-yall
+Cross-cutting: Reflection Loop, Circuit Breaker, Escalation, Consensus Voting.
 
-# Pick specific teams
-npx harness-for-yall fe-experts be-experts
+See [`docs/PATTERNS.md`](docs/PATTERNS.md) for full details.
 
-# Preview first
-npx harness-for-yall --dry-run
+## Usage
 
-# Overwrite existing
-npx harness-for-yall --force
-```
-
-Copies agents/skills to `~/.claude/`. Zero dependencies.
-
-### Option 2 — Plugin Marketplace
-
-Inside Claude Code:
-
-```
-/plugin marketplace add justn-hyeok/harness-for-yall
-```
-
-Then install what you need:
-
-```
-/plugin install dev-pipeline@justn-harness
-/plugin install review-pipeline@justn-harness
-/plugin install fe-experts@justn-harness
-/plugin install be-experts@justn-harness
-/plugin install explore-team@justn-harness
-```
-
-### Option 3 — Shell script
+### Skills (slash commands)
 
 ```bash
-git clone https://github.com/justn-hyeok/harness-for-yall.git
-cd harness-for-yall
-chmod +x install.sh && ./install.sh
+# Frontend work
+/fe-component "UserCard with avatar and role badge"
+/fe-page "Dashboard with stats and recent activity"
+
+# Backend work
+/be-api "POST /invoices with Zod validation"
+/be-mcp-server "GitHub integration MCP server"
+
+# Review
+/review-code src/auth/middleware.ts
+
+# Research
+/research-web "Compare Zustand vs Jotai for Next.js 15"
+
+# Debate
+/debate-tradeoff "SSR vs SPA for internal dashboard"
+
+# Operations
+/zombie-collector     # clean orphan processes
+/release              # release workflow
+/ci-watch             # monitor CI run
 ```
 
-## Architecture
+### Routing
+
+Claude Code routes your request to the right team automatically based on triggers in `CLAUDE.md`. You can also be explicit:
 
 ```
-                    ┌─────────────┐
-                    │  User Task  │
-                    └──────┬──────┘
-                           │
-              ┌────────────┼────────────┐
-              ▼            ▼            ▼
-        ┌──────────┐ ┌──────────┐ ┌──────────┐
-        │ Specific │ │ Generic  │ │ Analysis │
-        │ fe / be  │ │   dev    │ │ explore  │
-        └────┬─────┘ └────┬─────┘ └────┬─────┘
-             │             │             │
-             ▼             ▼             ▼
-        ┌──────────────────────────────────────┐
-        │            review-pipeline           │
-        │  screener×3 → moderator → judge      │
-        └──────────────────────────────────────┘
+"explore로 이 버그 조사해줘"
+"review-team으로 PR #42 리뷰해"
+"debate-team: Redis vs Memcached 결정해줘"
 ```
 
-### Routing Rules
+## Examples
 
-1. **Specificity first** — `fe-*` / `be-*` over `dev-*` when the task is clearly frontend or backend
-2. **Chainable** — `explore → dev → review` for complex workflows
-3. **Skip when overkill** — One-line fixes and simple questions don't need a harness
+See [`examples/`](examples/) for 5 real-world walkthroughs:
 
-### Model Strategy
+1. [Simple CRUD feature](examples/01-simple-feature.md) — dev-team
+2. [Code review](examples/02-code-review.md) — review-team (SARIF output)
+3. [Research task](examples/03-research-task.md) — research-team (Blackboard flow)
+4. [Architecture decision](examples/04-architecture-decision.md) — debate-team
+5. [Debugging + cleanup](examples/05-debugging-session.md) — explore-team → ops-team
 
-| Agent | Model | Why |
-|-------|-------|-----|
-| `explore-scout` | opus | Orchestration quality matters for architecture analysis |
-| Everything else | sonnet | Cost efficiency — sonnet handles implementation well |
+## Uninstall
 
-## Structure
-
-```
-.claude-plugin/
-  marketplace.json        # Plugin Marketplace catalog
-plugins/
-  dev-pipeline/           # 5 agents, 1 skill
-    .claude-plugin/plugin.json
-    agents/               # dev-planner, dev-frontend, dev-backend, dev-reviewer, dev-qa
-    skills/dev-feature/
-  review-pipeline/        # 5 agents, 1 skill
-    agents/               # review-screener-{1,2,3}, review-moderator, review-judge
-    skills/review-code/
-  fe-experts/             # 5 agents, 5 skills
-    agents/               # fe-architect, fe-implementer, fe-styler, fe-perf, fe-tester
-    skills/               # fe-component, fe-page, fe-refactor, fe-review, fe-test
-  be-experts/             # 7 agents, 5 skills
-    agents/               # be-architect, be-implementer, be-validator, be-resilience, be-provider, be-security, be-tester
-    skills/               # be-api, be-mcp-server, be-pipeline, be-llm-integration, be-observability
-  explore-team/           # 4 agents, 3 skills
-    agents/               # explore-scout, explore-hypothesizer, explore-evidence, explore-synthesizer
-    skills/               # explore-investigate, explore-quick, explore-hypothesis
-bin/install.mjs           # npx CLI
-package.json              # npm config
-install.sh                # Shell installer
-uninstall.sh              # Shell uninstaller
+```bash
+npx claude-harness-kit --uninstall
 ```
 
-## Customization
+## Creating custom teams
 
-Each agent is a standalone `.md` file with YAML frontmatter. Edit freely:
-
-```yaml
----
-name: fe-architect
-description: "React/Next.js component architecture"
-model: sonnet          # change to opus if you want
-tools:
-  - Read
-  - Glob
-  - Grep
----
-```
-
-Skills are in `SKILL.md` format inside named folders. Add your own by creating `plugins/<team>/skills/<name>/SKILL.md`.
+See [`docs/CREATING_TEAMS.md`](docs/CREATING_TEAMS.md).
 
 ## License
 
-MIT
+MIT — [justn-hyeok](https://github.com/justn-hyeok)

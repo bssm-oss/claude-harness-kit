@@ -1,6 +1,6 @@
 ---
 name: explore-evidence
-description: "Gathers supporting and refuting evidence for hypotheses via code search, file analysis, and test execution"
+description: "Use when a hypothesis needs validation; handles code search, file analysis, and test execution to gather supporting or refuting evidence."
 model: sonnet
 ---
 

@@ -1,0 +1,7 @@
+{
+  "name": "research-team",
+  "version": "1.0.0",
+  "description": "Blackboard-pattern research: planner -> crawler -> reader -> synthesizer for long-running web/doc research tasks",
+  "keywords": ["research", "web", "crawl", "search", "blackboard"],
+  "category": "research"
+}

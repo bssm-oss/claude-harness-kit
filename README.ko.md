@@ -1,184 +1,112 @@
-# harness-for-yall
+# claude-harness-kit
 
-[Claude Code](https://docs.anthropic.com/en/docs/claude-code)용 멀티에이전트 하네스: 에이전트 26개, 스킬 15개, 5개 팀.
+[![npm](https://img.shields.io/npm/v/claude-harness-kit)](https://www.npmjs.com/package/claude-harness-kit)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+
+Claude Code용 커뮤니티 하네스 킷 — 7가지 패턴, 8개 전문 팀으로 구성된 멀티에이전트 오케스트레이션.
 
 > **[English](./README.md)**
 
-## 이게 뭔데?
+## 설치
 
-Claude Code 에이전트를 5개 전문 팀으로 조직한 사전 설정 패키지. 각 팀은 목적에 맞는 멀티에이전트 오케스트레이션 패턴을 사용한다.
+```bash
+# npx로 바로 실행 (전역 설치 불필요)
+npx claude-harness-kit
+
+# 또는 전역 설치
+npm install -g claude-harness-kit
+claude-harness-kit
+```
+
+설치 후 에이전트와 스킬이 `~/.claude/agents/`와 `~/.claude/skills/`에 추가됩니다.
 
 ## 팀 구성
 
-| 플러그인 | 패턴 | 에이전트 | 스킬 | 하는 일 |
-|---------|------|:-------:|:----:|--------|
-| `dev-pipeline` | Pipeline | 5 | 1 | 기능 개발 전체: 기획 → FE+BE 병렬 → 리뷰 게이트 → QA |
-| `review-pipeline` | Fan-out / Fan-in | 5 | 1 | 코드 리뷰: 3개 스크리너 병렬 → 모더레이터 → 판정 (SARIF 출력) |
-| `fe-experts` | Expert Pool | 5 | 5 | 프론트엔드: 아키텍트 → 구현/스타일 → 성능 + 테스트 |
-| `be-experts` | Pipeline + Expert Pool | 7 | 5 | 백엔드: 아키텍트 → 구현+검증 → 회복성/프로바이더/보안 → 테스트 |
-| `explore-team` | Hierarchical Delegation | 4 | 3 | 코드베이스 탐색: 스카우트(opus) → 가설 → 증거 → 종합 |
-| `ops-kit` | Skills + Hook | 0 | 2 | 릴리즈 파이프라인(`/release`) + CI 자동 수정(`/ci-watch`) + push 훅 + CLAUDE.md 규칙 |
+| 팀 | 패턴 | 에이전트 | 스킬 | 언제 사용 |
+|----|------|:--------:|:----:|-----------|
+| `dev-team` | Pipeline | 5 | 1 | 풀스택 기능 개발 (FE + BE + 리뷰 + QA) |
+| `review-team` | Fan-out/Fan-in | 5 | 1 | 코드/PR 멀티스테이지 리뷰 |
+| `fe-team` | Expert Pool + Reflection | 6 | 5 | React, Next.js, Tailwind, a11y, 성능 |
+| `be-team` | Pipeline + Expert Pool + Reflection | 8 | 5 | Hono/Express API, LLM 통합, MCP |
+| `explore-team` | Hierarchical Delegation | 4 | 3 | 코드베이스 조사, 근본 원인 분석 |
+| `research-team` | Blackboard | 4 | 3 | 웹 리서치, 라이브러리 비교, 사실 수집 |
+| `debate-team` | Adversarial Debate | 4 | 2 | 아키텍처 결정, 트레이드오프 분석 |
+| `ops-team` | Skills + Hooks | 0 | 3 | 릴리즈, CI 감시, 좀비 프로세스 정리 |
 
-## 설치
+## 패턴
 
-### 방법 1 — npx
+| # | 패턴 | 설명 |
+|---|------|------|
+| 1 | Pipeline | 순차적 변환 — 각 단계 출력이 다음 단계 입력 |
+| 2 | Fan-out / Fan-in | 병렬 작업 후 모더레이터가 결과 통합 |
+| 3 | Expert Pool | 도메인별 전문 에이전트로 라우팅 |
+| 4 | Pipeline + Expert Pool | 순차 파이프라인, 각 단계가 전문가 |
+| 5 | Hierarchical Delegation | 스카우트 오케스트레이터 → 전문가에 위임 |
+| 6 | Adversarial Debate | 옹호자들이 논쟁, 심판이 최종 결정 (최대 5라운드) |
+| 7 | Blackboard | 공유 파일 상태; 에이전트가 명시적 핸드오프 없이 읽기/쓰기 |
 
-```bash
-# 전체 설치
-npx harness-for-yall
+Cross-cutting: Reflection Loop, Circuit Breaker, Escalation, Consensus Voting.
 
-# 원하는 팀만 골라서
-npx harness-for-yall fe-experts be-experts
+전체 내용은 [`docs/PATTERNS.md`](docs/PATTERNS.md) 참조.
 
-# 미리보기
-npx harness-for-yall --dry-run
+## 사용법
 
-# 기존 파일 덮어쓰기
-npx harness-for-yall --force
-```
-
-`~/.claude/`에 에이전트/스킬 파일을 복사한다. 의존성 없음.
-
-### 방법 2 — Plugin Marketplace
-
-Claude Code 안에서:
-
-```
-/plugin marketplace add justn-hyeok/harness-for-yall
-```
-
-필요한 팀 설치:
-
-```
-/plugin install dev-pipeline@justn-harness
-/plugin install review-pipeline@justn-harness
-/plugin install fe-experts@justn-harness
-/plugin install be-experts@justn-harness
-/plugin install explore-team@justn-harness
-```
-
-### 방법 3 — 쉘 스크립트
+### 스킬 (슬래시 커맨드)
 
 ```bash
-git clone https://github.com/justn-hyeok/harness-for-yall.git
-cd harness-for-yall
-chmod +x install.sh && ./install.sh
+# 프론트엔드
+/fe-component "아바타와 역할 뱃지가 있는 UserCard"
+/fe-page "통계와 최근 활동이 있는 대시보드"
+
+# 백엔드
+/be-api "Zod 검증이 포함된 POST /invoices"
+/be-mcp-server "GitHub 연동 MCP 서버"
+
+# 리뷰
+/review-code src/auth/middleware.ts
+
+# 리서치
+/research-web "Next.js 15에서 Zustand vs Jotai 비교"
+
+# 토론
+/debate-tradeoff "내부 대시보드에 SSR vs SPA"
+
+# 운영
+/zombie-collector     # 고아 프로세스 정리
+/release              # 릴리즈 워크플로우
+/ci-watch             # CI 실행 감시
 ```
 
-## 아키텍처
+### 라우팅
+
+CLAUDE.md의 트리거를 기반으로 자동 라우팅됩니다. 명시적 지정도 가능합니다:
 
 ```
-                    ┌─────────────┐
-                    │   사용자 요청  │
-                    └──────┬──────┘
-                           │
-              ┌────────────┼────────────┐
-              ▼            ▼            ▼
-        ┌──────────┐ ┌──────────┐ ┌──────────┐
-        │  특화 팀   │ │  범용 팀   │ │  분석 팀   │
-        │ fe / be  │ │   dev    │ │ explore  │
-        └────┬─────┘ └────┬─────┘ └────┬─────┘
-             │             │             │
-             ▼             ▼             ▼
-        ┌──────────────────────────────────────┐
-        │          review-pipeline             │
-        │  스크리너×3 → 모더레이터 → 판정관       │
-        └──────────────────────────────────────┘
+"explore로 이 버그 조사해줘"
+"review-team으로 PR #42 리뷰해"
+"debate-team: Redis vs Memcached 결정해줘"
 ```
 
-### 라우팅 규칙
+## 예시
 
-1. **구체성 우선** — 프론트/백엔드 특화 작업이면 `dev-*` 말고 `fe-*` / `be-*` 선택
-2. **체이닝 가능** — `explore → dev → review`로 복잡한 워크플로우 연결
-3. **과잉이면 생략** — 한 줄 수정이나 단순 질문에 하네스는 불필요
+실제 시나리오 5개는 [`examples/`](examples/)를 참조:
 
-### 모델 전략
+1. [단순 CRUD 기능](examples/01-simple-feature.md) — dev-team
+2. [코드 리뷰](examples/02-code-review.md) — review-team (SARIF 출력)
+3. [리서치 작업](examples/03-research-task.md) — research-team (Blackboard 흐름)
+4. [아키텍처 결정](examples/04-architecture-decision.md) — debate-team
+5. [디버깅 + 정리](examples/05-debugging-session.md) — explore-team → ops-team
 
-| 에이전트 | 모델 | 이유 |
-|---------|------|------|
-| `explore-scout` | opus | 아키텍처 분석 오케스트레이션에는 판단력이 중요 |
-| 나머지 전부 | sonnet | 비용 효율 — 구현 작업은 sonnet으로 충분 |
+## 제거
 
-## 팀별 상세
-
-### dev-pipeline (기능 개발)
-
-```
-사용자 요청 → dev-planner (기획)
-                  ↓
-        dev-frontend + dev-backend (병렬 구현)
-                  ↓
-            dev-reviewer (리뷰 게이트)
-                  ↓
-              dev-qa (테스트)
+```bash
+npx claude-harness-kit --uninstall
 ```
 
-**스킬:** `/dev-feature` — 기능 개발 전체 파이프라인 실행
+## 커스텀 팀 생성
 
-### review-pipeline (코드 리뷰)
-
-```
-코드/PR → review-screener-1 (정확성)  ──┐
-       → review-screener-2 (보안)     ──┼→ review-moderator → review-judge
-       → review-screener-3 (성능/스타일) ─┘        (통합)         (판정)
-```
-
-**스킬:** `/review-code` — SARIF v2.1.0 호환 리포트 출력
-
-### fe-experts (프론트엔드)
-
-```
-요청 → fe-architect (설계)
-           ├→ fe-implementer (구현)
-           ├→ fe-styler (스타일/접근성)
-           ├→ fe-perf (성능 리뷰)
-           └→ fe-tester (테스트)
-```
-
-**스킬:** `/fe-component`, `/fe-page`, `/fe-refactor`, `/fe-review`, `/fe-test`
-
-### be-experts (백엔드)
-
-```
-요청 → be-architect (API 설계)
-           ├→ be-implementer + be-validator (병렬)
-           ├→ be-resilience (회로 차단기/재시도)
-           ├→ be-provider (LLM 멀티프로바이더)
-           ├→ be-security (AuthN/Z, 시크릿, CORS, 감사로그, OWASP)
-           └→ be-tester (계약 테스트)
-```
-
-**스킬:** `/be-api`, `/be-mcp-server`, `/be-pipeline`, `/be-llm-integration`, `/be-observability`
-
-### explore-team (코드베이스 탐색)
-
-```
-질문 → explore-scout (opus, 정찰 + 오케스트레이션)
-           ├→ explore-hypothesizer (경쟁 가설 생성)
-           ├→ explore-evidence (증거 수집)
-           └→ explore-synthesizer (아키텍처 리포트)
-```
-
-**스킬:** `/explore-investigate`, `/explore-quick`, `/explore-hypothesis`
-
-## 커스터마이징
-
-각 에이전트는 YAML frontmatter가 있는 독립 `.md` 파일. 자유롭게 수정 가능:
-
-```yaml
----
-name: fe-architect
-description: "React/Next.js component architecture"
-model: sonnet          # opus로 바꾸면 업그레이드
-tools:
-  - Read
-  - Glob
-  - Grep
----
-```
-
-스킬은 `plugins/<팀>/skills/<이름>/SKILL.md` 형태. 새 스킬을 추가하려면 같은 구조로 폴더 만들면 된다.
+[`docs/CREATING_TEAMS.md`](docs/CREATING_TEAMS.md) 참조.
 
 ## 라이선스
 
-MIT
+MIT — [justn-hyeok](https://github.com/justn-hyeok)

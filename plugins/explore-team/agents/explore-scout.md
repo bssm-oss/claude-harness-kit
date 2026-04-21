@@ -1,6 +1,6 @@
 ---
 name: explore-scout
-description: "Opus-level codebase exploration lead — cross-cutting pattern detection and investigation orchestration"
+description: "Use when investigating codebase architecture, tracing a bug's root cause, or planning a major refactor; orchestrates hypothesizer, evidence, and synthesizer sub-agents."
 model: opus
 ---
 

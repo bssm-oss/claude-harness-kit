@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-import { existsSync, mkdirSync, cpSync, readdirSync, statSync, unlinkSync } from 'node:fs';
+import { existsSync, mkdirSync, cpSync, readdirSync, statSync, unlinkSync, chmodSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { homedir } from 'node:os';
 import { fileURLToPath } from 'node:url';
@@ -26,10 +26,10 @@ function collectFiles(src, dest, list = []) {
 
 function printHelp() {
   console.log(`
-  harness-for-yall — install multi-agent harness to ~/.claude/
+  claude-harness-kit — install multi-agent harness to ~/.claude/
 
   Usage:
-    npx harness-for-yall [options] [plugins...]
+    npx claude-harness-kit [options] [teams...]
 
   Options:
     --uninstall     Remove installed files
@@ -37,18 +37,21 @@ function printHelp() {
     --dry-run       Preview without copying
     --help, -h      Show this help
 
-  Plugins:
-    dev-pipeline    Feature development pipeline (5 agents, 1 skill)
-    review-pipeline Code review fan-out/fan-in (5 agents, 1 skill)
-    fe-experts      Frontend expert pool (5 agents, 5 skills)
-    be-experts      Backend expert pool (6 agents, 5 skills)
+  Teams:
+    dev-team        Feature development pipeline (5 agents, 1 skill)
+    review-team     Code review fan-out/fan-in (5 agents, 1 skill)
+    fe-team         Frontend expert pool + reflection (6 agents, 5 skills)
+    be-team         Backend expert pool + reflection (8 agents, 5 skills)
     explore-team    Codebase exploration (4 agents, 3 skills)
+    research-team   Blackboard-pattern web research (4 agents, 3 skills)
+    debate-team     Adversarial debate for decisions (4 agents, 2 skills)
+    ops-team        Release, CI watch, zombie-collector (0 agents, 3 skills)
 
   Examples:
-    npx harness-for-yall                          # All plugins
-    npx harness-for-yall fe-experts be-experts    # Specific plugins
-    npx harness-for-yall --dry-run                # Preview
-    npx harness-for-yall --force                  # Overwrite existing
+    npx claude-harness-kit                        # All teams
+    npx claude-harness-kit fe-team be-team        # Specific teams
+    npx claude-harness-kit --dry-run              # Preview
+    npx claude-harness-kit --force                # Overwrite existing
 `);
 }
 
@@ -75,7 +78,7 @@ async function main() {
     requestedPlugins.length > 0
       ? requestedPlugins.filter((p) => {
           if (!allPlugins.includes(p)) {
-            console.log(`  unknown plugin: ${p} (available: ${allPlugins.join(', ')})`);
+            console.log(`  unknown team: ${p} (available: ${allPlugins.join(', ')})`);
             return false;
           }
           return true;
@@ -83,20 +86,22 @@ async function main() {
       : allPlugins;
 
   if (plugins.length === 0) {
-    console.log('  no plugins to install.');
+    console.log('  no teams to install.');
     process.exit(1);
   }
 
   const mode = uninstall ? 'uninstall' : dryRun ? 'dry-run' : force ? 'force' : 'safe (skip existing)';
-  console.log(`\n  harness-for-yall ${uninstall ? 'uninstaller' : 'installer'}\n`);
+  console.log(`\n  claude-harness-kit ${uninstall ? 'uninstaller' : 'installer'}\n`);
   console.log(`  Target: ${CLAUDE_HOME}`);
-  console.log(`  Plugins: ${plugins.join(', ')}`);
+  console.log(`  Teams: ${plugins.join(', ')}`);
   console.log(`  Mode: ${mode}\n`);
 
   if (uninstall) {
     let removed = 0;
     for (const plugin of plugins) {
       const pluginDir = join(PLUGINS_DIR, plugin);
+
+      // agents
       const agentsDir = join(pluginDir, 'agents');
       if (existsSync(agentsDir)) {
         for (const f of readdirSync(agentsDir)) {
@@ -108,6 +113,8 @@ async function main() {
           }
         }
       }
+
+      // skills
       const skillsDir = join(pluginDir, 'skills');
       if (existsSync(skillsDir)) {
         for (const d of readdirSync(skillsDir, { withFileTypes: true })) {
@@ -120,6 +127,8 @@ async function main() {
           }
         }
       }
+
+      // harness docs
       const rootMds = readdirSync(pluginDir).filter(
         (f) => f.endsWith('.md') && statSync(join(pluginDir, f)).isFile()
       );
@@ -129,6 +138,19 @@ async function main() {
           if (!dryRun) unlinkSync(dest);
           console.log(`  remove: harnesses/${md}`);
           removed++;
+        }
+      }
+
+      // hooks (ops-team only)
+      const hooksDir = join(pluginDir, 'hooks');
+      if (existsSync(hooksDir)) {
+        for (const f of readdirSync(hooksDir)) {
+          const dest = join(CLAUDE_HOME, 'hooks', f);
+          if (existsSync(dest)) {
+            if (!dryRun) unlinkSync(dest);
+            console.log(`  remove: hooks/${f}`);
+            removed++;
+          }
         }
       }
     }
@@ -164,15 +186,29 @@ async function main() {
       }
     }
 
-    // harness docs (*.md at plugin root)
+    // harness docs (*.md at plugin root, excluding AGENTS.md)
     const rootMds = readdirSync(pluginDir).filter(
-      (f) => f.endsWith('.md') && statSync(join(pluginDir, f)).isFile()
+      (f) => f.endsWith('.md') && f !== 'AGENTS.md' && statSync(join(pluginDir, f)).isFile()
     );
     for (const md of rootMds) {
       operations.push({
         src: join(pluginDir, md),
         dest: join(CLAUDE_HOME, 'harnesses', md),
       });
+    }
+
+    // hooks/*.sh -> ~/.claude/hooks/ (ops-team)
+    const hooksDir = join(pluginDir, 'hooks');
+    if (existsSync(hooksDir)) {
+      for (const f of readdirSync(hooksDir)) {
+        if (f.endsWith('.sh')) {
+          operations.push({
+            src: join(hooksDir, f),
+            dest: join(CLAUDE_HOME, 'hooks', f),
+            executable: true,
+          });
+        }
+      }
     }
   }
 
@@ -194,6 +230,7 @@ async function main() {
       skipped++;
     } else {
       cpSync(op.src, op.dest);
+      if (op.executable) chmodSync(op.dest, 0o755);
       console.log(`  copy: ${rel}`);
       copied++;
     }
