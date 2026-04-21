@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.1.3] - 2026-04-22
+
+### Security
+- `bin/install.mjs`: add `assertSafeDest()` — resolves all dest paths and validates they are within `~/.claude/` before copy/delete (prevents path traversal)
+- `bin/install.mjs`: skip symlinks in `collectFiles()` (prevents symlink attacks via `cpSync`)
+- `bin/install.mjs`: hooks are now opt-in via `--install-hooks` flag; hook file previews printed before installation
+- `bin/install.mjs`: use platform-safe path separator (`sep`) in `rel` calculation
+- CI/release: pin all GitHub Actions to immutable commit SHAs (`actions/checkout`, `actions/setup-node`, `softprops/action-gh-release`)
+- release.yml: add `id-token: write` + `npm publish --provenance` for SLSA Level 2 supply-chain attestation
+- release.yml: bump Node to 22, drop deprecated Node 20
+
 ## [0.1.2] - 2026-04-22
 
 ### Added

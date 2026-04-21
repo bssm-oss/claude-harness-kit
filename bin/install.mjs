@@ -1,18 +1,27 @@
 #!/usr/bin/env node
 
-import { existsSync, mkdirSync, cpSync, readdirSync, statSync, unlinkSync, chmodSync } from 'node:fs';
-import { join, dirname } from 'node:path';
+import { existsSync, mkdirSync, cpSync, readdirSync, statSync, unlinkSync, chmodSync, readFileSync } from 'node:fs';
+import { join, dirname, resolve, sep } from 'node:path';
 import { homedir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const PLUGINS_DIR = join(__dirname, '..', 'plugins');
 const CLAUDE_HOME = join(homedir(), '.claude');
+const CLAUDE_HOME_RESOLVED = resolve(CLAUDE_HOME) + sep;
+
+function assertSafeDest(destPath) {
+  const resolved = resolve(destPath);
+  if (!resolved.startsWith(CLAUDE_HOME_RESOLVED)) {
+    throw new Error(`Path traversal detected: ${resolved}`);
+  }
+}
 
 function collectFiles(src, dest, list = []) {
   if (!existsSync(src)) return list;
   const entries = readdirSync(src, { withFileTypes: true });
   for (const entry of entries) {
+    if (entry.isSymbolicLink()) continue;
     const srcPath = join(src, entry.name);
     const destPath = join(dest, entry.name);
     if (entry.isDirectory()) {
@@ -32,14 +41,15 @@ function printHelp() {
     npx claude-harness-kit [options] [teams...]
 
   Options:
-    --uninstall     Remove installed files
-    --force, -f     Overwrite existing files
-    --dry-run       Preview without copying
-    --help, -h      Show this help
+    --uninstall       Remove installed files
+    --force, -f       Overwrite existing files
+    --dry-run         Preview without copying
+    --install-hooks   Also install shell hooks to ~/.claude/hooks/ (opt-in)
+    --help, -h        Show this help
 
   Teams:
     dev-team        Feature development pipeline (5 agents, 1 skill)
-    review-team     Code review fan-out/fan-in (5 agents, 1 skill)
+    review-team     Code review fan-out/fan-in (6 agents, 2 skills)
     fe-team         Frontend expert pool + reflection (6 agents, 5 skills)
     be-team         Backend expert pool + reflection (8 agents, 5 skills)
     explore-team    Codebase exploration (4 agents, 3 skills)
@@ -48,8 +58,9 @@ function printHelp() {
     ops-team        Release, CI watch, zombie-collector (0 agents, 3 skills)
 
   Examples:
-    npx claude-harness-kit                        # All teams
+    npx claude-harness-kit                        # All teams (no hooks)
     npx claude-harness-kit fe-team be-team        # Specific teams
+    npx claude-harness-kit --install-hooks        # All teams + shell hooks
     npx claude-harness-kit --dry-run              # Preview
     npx claude-harness-kit --force                # Overwrite existing
 `);
@@ -61,13 +72,14 @@ async function main() {
   const dryRun = args.includes('--dry-run');
   const uninstall = args.includes('--uninstall');
   const help = args.includes('--help') || args.includes('-h');
+  const installHooks = args.includes('--install-hooks');
 
   if (help) {
     printHelp();
     process.exit(0);
   }
 
-  const flags = ['--force', '-f', '--dry-run', '--uninstall', '--help', '-h'];
+  const flags = ['--force', '-f', '--dry-run', '--uninstall', '--help', '-h', '--install-hooks'];
   const requestedPlugins = args.filter((a) => !flags.includes(a));
 
   const allPlugins = readdirSync(PLUGINS_DIR, { withFileTypes: true })
@@ -94,7 +106,11 @@ async function main() {
   console.log(`\n  claude-harness-kit ${uninstall ? 'uninstaller' : 'installer'}\n`);
   console.log(`  Target: ${CLAUDE_HOME}`);
   console.log(`  Teams: ${plugins.join(', ')}`);
-  console.log(`  Mode: ${mode}\n`);
+  console.log(`  Mode: ${mode}`);
+  if (!uninstall && !installHooks) {
+    console.log(`  Hooks: skipped (pass --install-hooks to install shell hooks)`);
+  }
+  console.log();
 
   if (uninstall) {
     let removed = 0;
@@ -106,6 +122,7 @@ async function main() {
       if (existsSync(agentsDir)) {
         for (const f of readdirSync(agentsDir)) {
           const dest = join(CLAUDE_HOME, 'agents', f);
+          assertSafeDest(dest);
           if (existsSync(dest)) {
             if (!dryRun) unlinkSync(dest);
             console.log(`  remove: agents/${f}`);
@@ -120,6 +137,7 @@ async function main() {
         for (const d of readdirSync(skillsDir, { withFileTypes: true })) {
           if (!d.isDirectory()) continue;
           const dest = join(CLAUDE_HOME, 'skills', `${d.name}.md`);
+          assertSafeDest(dest);
           if (existsSync(dest)) {
             if (!dryRun) unlinkSync(dest);
             console.log(`  remove: skills/${d.name}.md`);
@@ -134,6 +152,7 @@ async function main() {
       );
       for (const md of rootMds) {
         const dest = join(CLAUDE_HOME, 'harnesses', md);
+        assertSafeDest(dest);
         if (existsSync(dest)) {
           if (!dryRun) unlinkSync(dest);
           console.log(`  remove: harnesses/${md}`);
@@ -141,12 +160,13 @@ async function main() {
         }
       }
 
-      // hooks (ops-team only)
+      // hooks
       const hooksDir = join(pluginDir, 'hooks');
       if (existsSync(hooksDir)) {
         for (const entry of readdirSync(hooksDir, { withFileTypes: true })) {
           if (!entry.isFile() || !entry.name.endsWith('.sh')) continue;
           const dest = join(CLAUDE_HOME, 'hooks', entry.name);
+          assertSafeDest(dest);
           if (existsSync(dest)) {
             if (!dryRun) unlinkSync(dest);
             console.log(`  remove: hooks/${entry.name}`);
@@ -198,18 +218,34 @@ async function main() {
       });
     }
 
-    // hooks/*.sh -> ~/.claude/hooks/ (ops-team)
-    const hooksDir = join(pluginDir, 'hooks');
-    if (existsSync(hooksDir)) {
-      for (const f of readdirSync(hooksDir)) {
-        if (f.endsWith('.sh')) {
-          operations.push({
-            src: join(hooksDir, f),
-            dest: join(CLAUDE_HOME, 'hooks', f),
-            executable: true,
-          });
+    // hooks/*.sh -> ~/.claude/hooks/ (opt-in via --install-hooks)
+    if (installHooks) {
+      const hooksDir = join(pluginDir, 'hooks');
+      if (existsSync(hooksDir)) {
+        for (const entry of readdirSync(hooksDir, { withFileTypes: true })) {
+          if (!entry.isFile() || !entry.isSymbolicLink?.() === false && entry.name.endsWith('.sh')) {
+            if (entry.isFile() && entry.name.endsWith('.sh')) {
+              operations.push({
+                src: join(hooksDir, entry.name),
+                dest: join(CLAUDE_HOME, 'hooks', entry.name),
+                executable: true,
+              });
+            }
+          }
         }
       }
+    }
+  }
+
+  // Print hook files to install so user can inspect them
+  const hookOps = operations.filter((op) => op.executable);
+  if (hookOps.length > 0) {
+    console.log(`  Hooks to install (review before proceeding):`);
+    for (const op of hookOps) {
+      console.log(`    ${op.src}`);
+      const lines = readFileSync(op.src, 'utf8').split('\n').slice(0, 5).join('\n  > ');
+      console.log(`  > ${lines}`);
+      console.log();
     }
   }
 
@@ -217,7 +253,8 @@ async function main() {
   let skipped = 0;
 
   for (const op of operations) {
-    const rel = op.dest.replace(CLAUDE_HOME + '/', '');
+    assertSafeDest(op.dest);
+    const rel = op.dest.replace(CLAUDE_HOME + sep, '');
     if (dryRun) {
       if (existsSync(op.dest)) {
         console.log(`  [skip] ${rel}`);
