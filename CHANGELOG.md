@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.0.2] - 2026-04-22
+
+### Added
+- `harnesses --codex` now also installs `~/.codex/prompts/debate.md` — enables `/debate` slash command in Codex TUI
+- `codex/prompts/` bundled in npm package
+
+---
+
 ## [1.0.1] - 2026-04-22
 
 ### Added
