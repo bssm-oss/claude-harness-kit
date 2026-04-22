@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.0.1] - 2026-04-22
+
+### Added
+- `--codex` / `--openai` / `--gpt` / `--chatgpt` flag: installs `codex-harnesses` Python package via `uv tool install` (pip fallback)
+- `--claude` / `--cc` / `--anthropic` flag: explicit Claude Code mode (existing behavior, still default)
+- `codex/` Python package bundled in npm: `codex-harnesses` v0.1.0 — adversarial debate team orchestration for Codex CLI
+  - `codex exec -c developer_instructions=...` subprocess pattern (no Agents SDK)
+  - 4 TOML agent definitions: advocate-a, advocate-b, devils-advocate, judge
+  - 18 pytest tests (runner, debate orchestration, CLI)
+
+---
+
 ## [1.0.0] - 2026-04-22
 
 ### Stable Open Source Release

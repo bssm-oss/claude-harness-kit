@@ -4,11 +4,16 @@ import { existsSync, mkdirSync, cpSync, readdirSync, statSync, unlinkSync, chmod
 import { join, dirname, resolve, sep } from 'node:path';
 import { homedir } from 'node:os';
 import { fileURLToPath } from 'node:url';
+import { spawnSync, spawn } from 'node:child_process';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const PLUGINS_DIR = join(__dirname, '..', 'plugins');
+const CODEX_DIR = join(__dirname, '..', 'codex');
 const CLAUDE_HOME = join(homedir(), '.claude');
 const CLAUDE_HOME_RESOLVED = resolve(CLAUDE_HOME) + sep;
+
+const CLAUDE_FLAGS = ['--claude', '--cc', '--anthropic'];
+const CODEX_FLAGS = ['--codex', '--openai', '--gpt', '--chatgpt'];
 
 function assertSafeDest(destPath) {
   const resolved = resolve(destPath);
@@ -33,21 +38,42 @@ function collectFiles(src, dest, list = []) {
   return list;
 }
 
+function findCommand(name) {
+  const result = spawnSync('which', [name], { encoding: 'utf8' });
+  return result.status === 0 ? result.stdout.trim() : null;
+}
+
+function runCommand(cmd, args) {
+  return new Promise((resolve, reject) => {
+    const proc = spawn(cmd, args, { stdio: 'inherit' });
+    proc.on('close', (code) => {
+      if (code === 0) resolve();
+      else reject(new Error(`${cmd} exited with code ${code}`));
+    });
+    proc.on('error', reject);
+  });
+}
+
 function printHelp() {
   console.log(`
-  harnesses — install multi-agent harness to ~/.claude/
+  harnesses — multi-agent orchestration kit
 
   Usage:
-    npx harnesses [options] [teams...]
+    npx harnesses [--claude | --codex] [options] [teams...]
 
-  Options:
-    --uninstall       Remove installed files
+  Provider:
+    --claude, --cc, --anthropic    Claude Code setup (default) — installs agents/skills to ~/.claude/
+    --codex,  --openai, --gpt,     Codex / OpenAI setup — installs codex-harnesses Python package
+              --chatgpt
+
+  Claude options:
+    --uninstall       Remove installed files from ~/.claude/
     --force, -f       Overwrite existing files
     --dry-run         Preview without copying
     --install-hooks   Also install shell hooks to ~/.claude/hooks/ (opt-in)
     --help, -h        Show this help
 
-  Teams:
+  Teams (Claude mode):
     dev-team        Feature development pipeline (5 agents, 1 skill)
     review-team     Code review fan-out/fan-in (6 agents, 2 skills)
     fe-team         Frontend expert pool + reflection (6 agents, 5 skills)
@@ -58,29 +84,72 @@ function printHelp() {
     ops-team        Release, CI watch, zombie-collector (0 agents, 3 skills)
 
   Examples:
-    npx harnesses                        # All teams (no hooks)
-    npx harnesses fe-team be-team        # Specific teams
-    npx harnesses --install-hooks        # All teams + shell hooks
-    npx harnesses --dry-run              # Preview
-    npx harnesses --force                # Overwrite existing
+    npx harnesses                        # Claude Code: all teams
+    npx harnesses --claude be-team       # Claude Code: backend team only
+    npx harnesses --codex                # Codex / OpenAI: install Python package
+    npx harnesses --dry-run              # Preview Claude install
+    npx harnesses --force                # Overwrite existing files
+    npx harnesses --install-hooks        # Also install shell hooks
 `);
 }
 
-async function main() {
-  const args = process.argv.slice(2);
+async function installCodex() {
+  console.log('\n  harnesses — Codex setup\n');
+
+  if (!existsSync(CODEX_DIR)) {
+    console.error('  ✗ codex/ bundle not found. Try reinstalling: npm i -g harnesses@latest');
+    process.exit(1);
+  }
+
+  console.log(`  Source: ${CODEX_DIR}`);
+  console.log(`  Package: codex-harnesses`);
+  console.log(`  Command after install: codex-harnesses --help\n`);
+
+  const uv = findCommand('uv');
+
+  if (uv) {
+    console.log('  Using uv tool install...');
+    await runCommand('uv', ['tool', 'install', '--reinstall', CODEX_DIR]);
+    console.log('\n  ✓ Done!\n');
+    console.log('  Run: codex-harnesses "Should we use PostgreSQL or MongoDB?" --option-a PostgreSQL --option-b MongoDB\n');
+    return;
+  }
+
+  const pip = findCommand('pip3') || findCommand('pip');
+  if (!pip) {
+    console.error('  ✗ Neither uv nor pip3 found.\n');
+    console.error('  Install uv (recommended):');
+    console.error('    curl -LsSf https://astral.sh/uv/install.sh | sh\n');
+    console.error('  Then re-run: npx harnesses --codex\n');
+    process.exit(1);
+  }
+
+  console.log(`  Using ${pip} install --user...`);
+  try {
+    await runCommand(pip, ['install', '--user', CODEX_DIR]);
+    console.log('\n  ✓ Done!\n');
+    console.log('  If codex-harnesses is not in PATH, add ~/.local/bin to your PATH.\n');
+    console.log('  Run: codex-harnesses "question" --option-a A --option-b B\n');
+  } catch {
+    console.error('\n  pip install failed (possibly PEP 668 system Python restriction).\n');
+    console.error('  Fix: install uv and retry:');
+    console.error('    curl -LsSf https://astral.sh/uv/install.sh | sh');
+    console.error('    npx harnesses --codex\n');
+    process.exit(1);
+  }
+}
+
+async function installClaude(args) {
   const force = args.includes('--force') || args.includes('-f');
   const dryRun = args.includes('--dry-run');
   const uninstall = args.includes('--uninstall');
-  const help = args.includes('--help') || args.includes('-h');
   const installHooks = args.includes('--install-hooks');
 
-  if (help) {
-    printHelp();
-    process.exit(0);
-  }
-
-  const flags = ['--force', '-f', '--dry-run', '--uninstall', '--help', '-h', '--install-hooks'];
-  const requestedPlugins = args.filter((a) => !flags.includes(a));
+  const allFlags = [
+    '--force', '-f', '--dry-run', '--uninstall', '--install-hooks',
+    ...CLAUDE_FLAGS, ...CODEX_FLAGS,
+  ];
+  const requestedPlugins = args.filter((a) => !allFlags.includes(a));
 
   const allPlugins = readdirSync(PLUGINS_DIR, { withFileTypes: true })
     .filter((d) => d.isDirectory())
@@ -117,7 +186,6 @@ async function main() {
     for (const plugin of plugins) {
       const pluginDir = join(PLUGINS_DIR, plugin);
 
-      // agents
       const agentsDir = join(pluginDir, 'agents');
       if (existsSync(agentsDir)) {
         for (const f of readdirSync(agentsDir)) {
@@ -131,7 +199,6 @@ async function main() {
         }
       }
 
-      // commands (skills)
       const skillsDir = join(pluginDir, 'skills');
       if (existsSync(skillsDir)) {
         for (const d of readdirSync(skillsDir, { withFileTypes: true })) {
@@ -146,7 +213,6 @@ async function main() {
         }
       }
 
-      // harness docs
       const rootMds = readdirSync(pluginDir).filter(
         (f) => f.endsWith('.md') && f !== 'AGENTS.md' && statSync(join(pluginDir, f)).isFile()
       );
@@ -160,7 +226,6 @@ async function main() {
         }
       }
 
-      // hooks
       const hooksDir = join(pluginDir, 'hooks');
       if (existsSync(hooksDir)) {
         for (const entry of readdirSync(hooksDir, { withFileTypes: true })) {
@@ -184,13 +249,11 @@ async function main() {
   for (const plugin of plugins) {
     const pluginDir = join(PLUGINS_DIR, plugin);
 
-    // agents/ -> ~/.claude/agents/
     const agentsDir = join(pluginDir, 'agents');
     if (existsSync(agentsDir)) {
       operations.push(...collectFiles(agentsDir, join(CLAUDE_HOME, 'agents')));
     }
 
-    // skills/<name>/SKILL.md -> ~/.claude/commands/<name>.md
     const skillsDir = join(pluginDir, 'skills');
     if (existsSync(skillsDir)) {
       const skillFolders = readdirSync(skillsDir, { withFileTypes: true }).filter((d) =>
@@ -207,7 +270,6 @@ async function main() {
       }
     }
 
-    // harness docs (*.md at plugin root, excluding AGENTS.md)
     const rootMds = readdirSync(pluginDir).filter(
       (f) => f.endsWith('.md') && f !== 'AGENTS.md' && statSync(join(pluginDir, f)).isFile()
     );
@@ -218,26 +280,22 @@ async function main() {
       });
     }
 
-    // hooks/*.sh -> ~/.claude/hooks/ (opt-in via --install-hooks)
     if (installHooks) {
       const hooksDir = join(pluginDir, 'hooks');
       if (existsSync(hooksDir)) {
         for (const entry of readdirSync(hooksDir, { withFileTypes: true })) {
-          if (!entry.isFile() || !entry.isSymbolicLink?.() === false && entry.name.endsWith('.sh')) {
-            if (entry.isFile() && entry.name.endsWith('.sh')) {
-              operations.push({
-                src: join(hooksDir, entry.name),
-                dest: join(CLAUDE_HOME, 'hooks', entry.name),
-                executable: true,
-              });
-            }
+          if (entry.isFile() && entry.name.endsWith('.sh')) {
+            operations.push({
+              src: join(hooksDir, entry.name),
+              dest: join(CLAUDE_HOME, 'hooks', entry.name),
+              executable: true,
+            });
           }
         }
       }
     }
   }
 
-  // Print hook files to install so user can inspect them
   const hookOps = operations.filter((op) => op.executable);
   if (hookOps.length > 0) {
     console.log(`  Hooks to install (review before proceeding):`);
@@ -280,6 +338,23 @@ async function main() {
   }
 
   console.log(`\n  Done! ${dryRun ? 'Would copy' : 'Copied'}: ${copied}, Skipped: ${skipped}\n`);
+}
+
+async function main() {
+  const args = process.argv.slice(2);
+  const help = args.includes('--help') || args.includes('-h');
+  const isCodexMode = CODEX_FLAGS.some((f) => args.includes(f));
+
+  if (help) {
+    printHelp();
+    process.exit(0);
+  }
+
+  if (isCodexMode) {
+    await installCodex();
+  } else {
+    await installClaude(args);
+  }
 }
 
 main().catch((err) => {

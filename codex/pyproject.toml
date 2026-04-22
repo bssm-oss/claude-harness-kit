@@ -1,0 +1,35 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "codex-harnesses"
+version = "0.1.0"
+description = "Multi-agent orchestration for Codex CLI — debate, research, explore teams"
+requires-python = ">=3.11"
+license = { text = "MIT" }
+authors = [{ name = "justn-hyeok" }]
+keywords = ["codex", "multi-agent", "orchestration", "openai", "llm"]
+dependencies = [
+    "typer>=0.12",
+    "rich>=13",
+]
+
+[project.scripts]
+codex-harnesses = "codex_harnesses.cli:app"
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8",
+    "pytest-asyncio>=0.23",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/codex_harnesses"]
+
+[tool.hatch.build.targets.wheel.sources]
+"src" = ""
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
