@@ -110,33 +110,49 @@ async function installCodex() {
   if (uv) {
     console.log('  Using uv tool install...');
     await runCommand('uv', ['tool', 'install', '--reinstall', CODEX_DIR]);
-    console.log('\n  ✓ Done!\n');
-    console.log('  Run: codex-harnesses "Should we use PostgreSQL or MongoDB?" --option-a PostgreSQL --option-b MongoDB\n');
-    return;
+  } else {
+    const pip = findCommand('pip3') || findCommand('pip');
+    if (!pip) {
+      console.error('  ✗ Neither uv nor pip3 found.\n');
+      console.error('  Install uv (recommended):');
+      console.error('    curl -LsSf https://astral.sh/uv/install.sh | sh\n');
+      console.error('  Then re-run: npx harnesses --codex\n');
+      process.exit(1);
+    }
+    console.log(`  Using ${pip} install --user...`);
+    try {
+      await runCommand(pip, ['install', '--user', CODEX_DIR]);
+    } catch {
+      console.error('\n  pip install failed (possibly PEP 668 system Python restriction).\n');
+      console.error('  Fix: install uv and retry:');
+      console.error('    curl -LsSf https://astral.sh/uv/install.sh | sh');
+      console.error('    npx harnesses --codex\n');
+      process.exit(1);
+    }
   }
 
-  const pip = findCommand('pip3') || findCommand('pip');
-  if (!pip) {
-    console.error('  ✗ Neither uv nor pip3 found.\n');
-    console.error('  Install uv (recommended):');
-    console.error('    curl -LsSf https://astral.sh/uv/install.sh | sh\n');
-    console.error('  Then re-run: npx harnesses --codex\n');
-    process.exit(1);
+  // Install Codex TUI slash command prompts → ~/.codex/prompts/
+  const promptsSrc = join(CODEX_DIR, 'prompts');
+  if (existsSync(promptsSrc)) {
+    const codexPromptsDir = join(homedir(), '.codex', 'prompts');
+    mkdirSync(codexPromptsDir, { recursive: true });
+    let promptsCopied = 0;
+    for (const entry of readdirSync(promptsSrc, { withFileTypes: true })) {
+      if (!entry.isFile() || !entry.name.endsWith('.md')) continue;
+      const dest = join(codexPromptsDir, entry.name);
+      cpSync(join(promptsSrc, entry.name), dest);
+      console.log(`  prompt: ~/.codex/prompts/${entry.name}`);
+      promptsCopied++;
+    }
+    if (promptsCopied > 0) {
+      console.log(`\n  Codex TUI slash commands installed (type / in Codex to use):`);
+      console.log(`    /debate "question" --option-a A --option-b B`);
+    }
   }
 
-  console.log(`  Using ${pip} install --user...`);
-  try {
-    await runCommand(pip, ['install', '--user', CODEX_DIR]);
-    console.log('\n  ✓ Done!\n');
-    console.log('  If codex-harnesses is not in PATH, add ~/.local/bin to your PATH.\n');
-    console.log('  Run: codex-harnesses "question" --option-a A --option-b B\n');
-  } catch {
-    console.error('\n  pip install failed (possibly PEP 668 system Python restriction).\n');
-    console.error('  Fix: install uv and retry:');
-    console.error('    curl -LsSf https://astral.sh/uv/install.sh | sh');
-    console.error('    npx harnesses --codex\n');
-    process.exit(1);
-  }
+  console.log('\n  ✓ Done!\n');
+  console.log('  CLI:    codex-harnesses "question" --option-a A --option-b B');
+  console.log('  Codex:  /debate "question" --option-a A --option-b B\n');
 }
 
 async function installClaude(args) {

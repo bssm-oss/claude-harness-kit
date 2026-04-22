@@ -15,6 +15,7 @@
     "examples/",
     "codex/src/",
     "codex/agents/",
+    "codex/prompts/",
     "codex/pyproject.toml",
     "README.md",
     "README.ko.md",
