@@ -1,5 +1,23 @@
 # Changelog
 
+## [1.0.0] - 2026-04-22
+
+### Stable Open Source Release
+
+First stable release. Fully tested install/uninstall pipeline, all 8 teams and 24 slash commands verified working.
+
+### Added
+- `CONTRIBUTING.md`: team/agent/skill contribution guide
+- `SECURITY.md`: vulnerability reporting policy
+- `CODE_OF_CONDUCT.md`: Contributor Covenant v2.1
+
+### Fixed
+- Skills now install to `~/.claude/commands/` (not `~/.claude/skills/`) — slash commands work correctly in Claude Code
+- `bin/install.mjs`: path traversal defense (`assertSafeDest`), symlink skipping, hooks opt-in via `--install-hooks`
+- Shell scripts: POSIX-safe arithmetic (`n=$((n+1))`), AGENTS.md exclusion, hooks copy/remove blocks
+
+---
+
 ## [0.1.4] - 2026-04-22
 
 ### Fixed
