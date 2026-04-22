@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.1.4] - 2026-04-22
+
+### Fixed
+- Install skills to `~/.claude/commands/` instead of `~/.claude/skills/` — skills now work as Claude Code slash commands
+- Updated `bin/install.mjs`, `scripts/install.sh`, `scripts/uninstall.sh` accordingly
+
 ## [0.1.3] - 2026-04-22
 
 ### Security

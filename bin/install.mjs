@@ -131,16 +131,16 @@ async function main() {
         }
       }
 
-      // skills
+      // commands (skills)
       const skillsDir = join(pluginDir, 'skills');
       if (existsSync(skillsDir)) {
         for (const d of readdirSync(skillsDir, { withFileTypes: true })) {
           if (!d.isDirectory()) continue;
-          const dest = join(CLAUDE_HOME, 'skills', `${d.name}.md`);
+          const dest = join(CLAUDE_HOME, 'commands', `${d.name}.md`);
           assertSafeDest(dest);
           if (existsSync(dest)) {
             if (!dryRun) unlinkSync(dest);
-            console.log(`  remove: skills/${d.name}.md`);
+            console.log(`  remove: commands/${d.name}.md`);
             removed++;
           }
         }
@@ -190,7 +190,7 @@ async function main() {
       operations.push(...collectFiles(agentsDir, join(CLAUDE_HOME, 'agents')));
     }
 
-    // skills/<name>/SKILL.md -> ~/.claude/skills/<name>.md
+    // skills/<name>/SKILL.md -> ~/.claude/commands/<name>.md
     const skillsDir = join(pluginDir, 'skills');
     if (existsSync(skillsDir)) {
       const skillFolders = readdirSync(skillsDir, { withFileTypes: true }).filter((d) =>
@@ -201,7 +201,7 @@ async function main() {
         if (existsSync(skillFile)) {
           operations.push({
             src: skillFile,
-            dest: join(CLAUDE_HOME, 'skills', `${folder.name}.md`),
+            dest: join(CLAUDE_HOME, 'commands', `${folder.name}.md`),
           });
         }
       }

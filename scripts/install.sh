@@ -4,7 +4,7 @@ set -euo pipefail
 REPO_DIR="$(cd "$(dirname "$0")" && pwd)"
 CLAUDE_DIR="$HOME/.claude"
 
-mkdir -p "$CLAUDE_DIR/agents" "$CLAUDE_DIR/skills" "$CLAUDE_DIR/harnesses" "$CLAUDE_DIR/hooks"
+mkdir -p "$CLAUDE_DIR/agents" "$CLAUDE_DIR/commands" "$CLAUDE_DIR/harnesses" "$CLAUDE_DIR/hooks"
 
 copied=0
 skipped=0
@@ -28,14 +28,14 @@ for d in "$REPO_DIR"/plugins/*/skills/*/; do
   [ -d "$d" ] || continue
   name="$(basename "$d")"
   src="$d/SKILL.md"
-  dest="$CLAUDE_DIR/skills/${name}.md"
+  dest="$CLAUDE_DIR/commands/${name}.md"
   if [ ! -f "$src" ]; then continue; fi
   if [ -f "$dest" ]; then
-    echo "skip: skills/${name}.md"
+    echo "skip: commands/${name}.md"
     skipped=$((skipped + 1))
   else
     cp "$src" "$dest"
-    echo "copy: skills/${name}.md"
+    echo "copy: commands/${name}.md"
     copied=$((copied + 1))
   fi
 done

@@ -21,10 +21,10 @@ done
 for d in "$REPO_DIR"/plugins/*/skills/*/; do
   [ -d "$d" ] || continue
   name="$(basename "$d")"
-  dest="$CLAUDE_DIR/skills/${name}.md"
+  dest="$CLAUDE_DIR/commands/${name}.md"
   if [ -f "$dest" ]; then
     rm "$dest"
-    echo "removed: skills/${name}.md"
+    echo "removed: commands/${name}.md"
     removed=$((removed + 1))
   fi
 done
