@@ -6,6 +6,9 @@
   "bin": {
     "harnesses": "bin/install.mjs"
   },
+  "scripts": {
+    "test": "node --test"
+  },
   "files": [
     "bin/",
     "plugins/",
