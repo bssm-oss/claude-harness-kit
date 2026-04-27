@@ -18,11 +18,11 @@ No Agents SDK needed — pure subprocess orchestration.
 | Execution layer | `codex exec` subprocess | Agents SDK + MCPServerStdio + GPT-4.1 bridge | Simpler; no relay cost; trivially testable with subprocess mocks |
 | Output capture | `-o <tmpfile>` | `--json` JSONL parse | One line; no JSONL event parsing |
 | Instruction injection | `-c developer_instructions=...` | Named TOML agent files | Per-call; avoids Codex issue #15250 (named agents inaccessible from MCP sessions) |
-| Flow control | Python asyncio | o3 dynamic planner | Fixed-flow teams (debate: A→B→DA→Judge) need no runtime planning |
+| Flow control | Python asyncio | o3 dynamic planner | Fixed-flow teams and chained teams are explicit, testable Python flows |
 | Parallelism | `asyncio.gather` for independent steps | threads | Native async; works with `asyncio.create_subprocess_exec` |
 | Model | inherits `~/.codex/config.toml` default | hardcoded `gpt-4.1` | Respects user config; overridable per-call with `-m` |
 
-o3 as planner is reserved for research-team where crawl strategy must adapt dynamically.
+Dynamic planning is deliberately kept outside the first implementation. The router chooses a team or chain; each team owns its deterministic flow.
 
 ---
 
@@ -35,16 +35,21 @@ codex/                         # Codex layer, sibling to claudecode/ and core/
 │   └── codex_harnesses/
 │       ├── __init__.py        # version only
 │       ├── runner.py          # run_worker() — subprocess wrapper
-│       ├── cli.py             # typer app: codex-harnesses run <team> "..."
+│       ├── cli.py             # debate/route/run/resume commands
+│       ├── routing.py         # natural-language team classifier
+│       ├── state.py           # .harness/runs/<run-id>/ recorder
 │       └── teams/
 │           ├── __init__.py
-│           └── debate.py      # DebateOrchestrator
+│           ├── debate.py      # Advocate A → B → DA → Judge
+│           ├── explore.py     # Scout → Hypotheses → Evidence → Synthesis
+│           ├── review.py      # Fan-out reviewers → Moderator → Judge
+│           └── research.py    # Plan → Collect → Read → Synthesize
 └── agents/
-    └── debate/
-        ├── advocate_a.toml    # developer_instructions content
-        ├── advocate_b.toml
-        ├── devils_advocate.toml
-        └── judge.toml
+    ├── debate/
+    ├── explore/
+    ├── review/
+    └── research/
+codex/plugin/harnesses/        # Codex plugin/skills for auto-routing
 ```
 
 ---
@@ -129,7 +134,7 @@ Step 4 — Judge
 ```
 
 Steps 1→2→3→4 are sequential (each reads the previous output).  
-`asyncio.gather` reserved for research-team's parallel crawlers.
+Review uses `asyncio.gather` for independent correctness/security/performance reviewers.
 
 ---
 
@@ -176,14 +181,22 @@ Python loads this at runtime with `tomllib.loads()` — no hardcoded prompts in 
 uv venv .venv && uv pip install -e .
 source .venv/bin/activate
 
-# 실행 — typer 단일 커맨드 flattening: 'debate' 서브커맨드 이름 생략
+# 실행
+codex-harnesses route "Redis vs Memcached 결정해줘" --json
+codex-harnesses run "Review this PR for correctness and security"
+codex-harnesses run "Redis vs Memcached 결정해줘"
 codex-harnesses "PostgreSQL vs MongoDB?" --option-a PostgreSQL --option-b MongoDB
 codex-harnesses "Should we use microservices?" -a yes -b no
+codex-harnesses resume <run-id>
 
-# 팀 추가 시 서브커맨드로 자동 분리됨 (typer 동작 방식)
-# codex-harnesses debate "..." --option-a A --option-b B
-# codex-harnesses research "..."
+# 명시적 팀 실행
+codex-harnesses run "Investigate auth flow" --team explore
+codex-harnesses debate "PostgreSQL vs MongoDB?" --option-a PostgreSQL --option-b MongoDB
 ```
+
+The console entrypoint rewrites legacy default debate calls to `debate ...` before
+invoking Typer, preserving the original `codex-harnesses "..." --option-a ...`
+UX while allowing multiple subcommands.
 
 ---
 
@@ -196,8 +209,8 @@ build-backend = "hatchling.build"
 
 [project]
 name = "codex-harnesses"
-version = "0.1.0"
-description = "Multi-agent orchestration for Codex CLI"
+version = "0.1.1"
+description = "Codex-native multi-agent orchestration with routing, teams, and saved runs"
 requires-python = ">=3.11"
 dependencies = [
     "typer>=0.12",
@@ -205,13 +218,30 @@ dependencies = [
 ]
 
 [project.scripts]
-codex-harnesses = "codex_harnesses.cli:app"
+codex-harnesses = "codex_harnesses.cli:main"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/codex_harnesses"]
 ```
 
 No `openai-agents` dependency — pure stdlib + typer + rich.
+
+---
+
+## Run state
+
+Every saved run writes:
+
+```text
+.harness/runs/<run-id>/
+├── manifest.json
+├── trace.jsonl
+├── transcript.md
+├── artifacts/
+└── blackboard/
+```
+
+`resume <run-id>` reads the manifest and transcript from the current workdir.
 
 ---
 
@@ -223,6 +253,7 @@ The repository is split into three top-level product layers:
 - `claudecode/plugins/`: Claude Code teams, agents, skills, hooks, and harness docs.
 - `codex/`: executable Python orchestration for Codex CLI.
 
-Codex currently ships the debate pipeline. Future Codex teams should live under
-`codex/src/codex_harnesses/teams/` and reuse the shared pattern language from
-`core/` rather than importing Claude Code prompt files directly.
+Codex ships independent team implementations under
+`codex/src/codex_harnesses/teams/` and reuses the shared pattern language from
+`core/` rather than importing Claude Code prompt files directly. The Codex plugin
+under `codex/plugin/harnesses/` is the automatic routing surface for the app.

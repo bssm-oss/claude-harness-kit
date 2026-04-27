@@ -1,6 +1,6 @@
 {
   "name": "harnesses",
-  "version": "1.0.3",
+  "version": "1.0.4",
   "description": "Community harness kit for Claude Code — multi-agent orchestration with 7 patterns, 8 teams, built-in operations tooling",
   "type": "module",
   "bin": {
@@ -17,6 +17,7 @@
     "examples/",
     "codex/src/codex_harnesses/**/*.py",
     "codex/agents/",
+    "codex/plugin/",
     "codex/prompts/",
     "codex/pyproject.toml",
     "README.md",

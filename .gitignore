@@ -9,3 +9,14 @@ review-report.sarif.json
 codex/.venv/
 codex/**/__pycache__/
 codex/**/*.egg-info/
+**/__pycache__/
+**/.pytest_cache/
+**/.venv/
+**/*.pyc
+**/*.pyo
+uv.lock
+
+# Python
+codex/.venv/
+codex/**/__pycache__/
+codex/**/*.egg-info/

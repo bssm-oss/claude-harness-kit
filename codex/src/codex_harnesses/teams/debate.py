@@ -1,20 +1,13 @@
-import tomllib
 from dataclasses import dataclass
-from importlib.resources import files
-from pathlib import Path
 
+from ..instructions import load_instructions
 from ..runner import run_worker, WorkerResult
-
-_PACKAGE_AGENTS_DIR = files("codex_harnesses").joinpath("agents", "debate")
-_SOURCE_AGENTS_DIR = Path(__file__).resolve().parents[3] / "agents" / "debate"
+from ..state import RunRecorder
+from ..types import SectionResult, TeamRunResult
 
 
 def _load_instructions(name: str) -> str:
-    path = _PACKAGE_AGENTS_DIR.joinpath(f"{name}.toml")
-    if not path.is_file():
-        path = _SOURCE_AGENTS_DIR / f"{name}.toml"
-    data = tomllib.loads(path.read_text(encoding="utf-8"))
-    return data["developer_instructions"]
+    return load_instructions("debate", name)
 
 
 @dataclass
@@ -33,6 +26,8 @@ async def run_debate(
     option_a: str,
     option_b: str,
     workdir: str | None = None,
+    model: str | None = None,
+    recorder: RunRecorder | None = None,
 ) -> DebateResult:
     di_a = _load_instructions("advocate_a")
     di_b = _load_instructions("advocate_b")
@@ -47,8 +42,11 @@ async def run_debate(
             f"You are arguing FOR: {option_a}"
         ),
         developer_instructions=di_a,
+        model=model,
         workdir=workdir,
     )
+    if recorder:
+        recorder.record_step(result_a.role, f"Advocate A - {option_a}", result_a.output)
 
     # Step 2 — Advocate B reads A's argument, argues for Option B and rebuts A
     result_b = await run_worker(
@@ -59,8 +57,11 @@ async def run_debate(
             f"Advocate A argued:\n{result_a.output}"
         ),
         developer_instructions=di_b,
+        model=model,
         workdir=workdir,
     )
+    if recorder:
+        recorder.record_step(result_b.role, f"Advocate B - {option_b}", result_b.output)
 
     # Step 3 — Devil's Advocate challenges both sides
     result_da = await run_worker(
@@ -71,8 +72,11 @@ async def run_debate(
             f"Advocate B ({option_b}):\n{result_b.output}"
         ),
         developer_instructions=di_da,
+        model=model,
         workdir=workdir,
     )
+    if recorder:
+        recorder.record_step(result_da.role, "Devil's Advocate", result_da.output)
 
     # Step 4 — Judge issues verdict
     result_judge = await run_worker(
@@ -85,8 +89,11 @@ async def run_debate(
             f"Devil's Advocate:\n{result_da.output}"
         ),
         developer_instructions=di_judge,
+        model=model,
         workdir=workdir,
     )
+    if recorder:
+        recorder.record_step(result_judge.role, "Judge's Verdict", result_judge.output)
 
     return DebateResult(
         question=question,
@@ -96,4 +103,32 @@ async def run_debate(
         advocate_b=result_b,
         devils_advocate=result_da,
         judge=result_judge,
+    )
+
+
+async def run_debate_as_team(
+    request: str,
+    option_a: str,
+    option_b: str,
+    workdir: str | None = None,
+    model: str | None = None,
+    recorder: RunRecorder | None = None,
+) -> TeamRunResult:
+    result = await run_debate(
+        request,
+        option_a,
+        option_b,
+        workdir=workdir,
+        model=model,
+        recorder=recorder,
+    )
+    return TeamRunResult(
+        team="debate",
+        request=request,
+        sections=[
+            SectionResult.from_worker(f"Advocate A - {option_a}", result.advocate_a),
+            SectionResult.from_worker(f"Advocate B - {option_b}", result.advocate_b),
+            SectionResult.from_worker("Devil's Advocate", result.devils_advocate),
+            SectionResult.from_worker("Judge's Verdict", result.judge),
+        ],
     )

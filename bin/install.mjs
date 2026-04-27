@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-import { existsSync, mkdirSync, cpSync, readdirSync, statSync, unlinkSync, chmodSync, readFileSync } from 'node:fs';
+import { existsSync, mkdirSync, cpSync, readdirSync, statSync, unlinkSync, chmodSync, readFileSync, writeFileSync, rmSync } from 'node:fs';
 import { join, dirname, resolve, sep } from 'node:path';
 import { homedir } from 'node:os';
 import { fileURLToPath } from 'node:url';
@@ -10,8 +10,11 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const CLAUDECODE_DIR = join(__dirname, '..', 'claudecode');
 const PLUGINS_DIR = join(CLAUDECODE_DIR, 'plugins');
 const CODEX_DIR = join(__dirname, '..', 'codex');
+const CODEX_PLUGIN_DIR = join(CODEX_DIR, 'plugin', 'harnesses');
+const CODEX_PLUGIN_ID = 'harnesses@harnesses';
 const CLAUDE_HOME = join(homedir(), '.claude');
 const CLAUDE_HOME_RESOLVED = resolve(CLAUDE_HOME) + sep;
+const HOME_RESOLVED = resolve(homedir()) + sep;
 
 const CLAUDE_FLAGS = ['--claude', '--cc', '--anthropic'];
 const CODEX_FLAGS = ['--codex', '--openai', '--gpt', '--chatgpt'];
@@ -19,6 +22,13 @@ const CODEX_FLAGS = ['--codex', '--openai', '--gpt', '--chatgpt'];
 function assertSafeDest(destPath) {
   const resolved = resolve(destPath);
   if (!resolved.startsWith(CLAUDE_HOME_RESOLVED)) {
+    throw new Error(`Path traversal detected: ${resolved}`);
+  }
+}
+
+function assertInsideHome(destPath) {
+  const resolved = resolve(destPath);
+  if (!resolved.startsWith(HOME_RESOLVED)) {
     throw new Error(`Path traversal detected: ${resolved}`);
   }
 }
@@ -64,7 +74,7 @@ function printHelp() {
 
   Provider:
     --claude, --cc, --anthropic    Claude Code setup (default) — installs agents/skills to ~/.claude/
-    --codex,  --openai, --gpt,     Codex / OpenAI setup — installs codex-harnesses Python package
+    --codex,  --openai, --gpt,     Codex / OpenAI setup — installs Python package + auto-routing plugin
               --chatgpt
 
   Claude options:
@@ -73,6 +83,10 @@ function printHelp() {
     --dry-run         Preview without copying
     --install-hooks   Also install shell hooks to ~/.claude/hooks/ (opt-in)
     --help, -h        Show this help
+
+  Codex options:
+    --uninstall       Remove codex-harnesses tool, prompts, and plugin files
+    --dry-run         Preview without installing
 
   Teams (Claude mode):
     dev-team        Feature development pipeline (5 agents, 1 skill)
@@ -87,14 +101,209 @@ function printHelp() {
   Examples:
     npx harnesses                        # Claude Code: all teams
     npx harnesses --claude be-team       # Claude Code: backend team only
-    npx harnesses --codex                # Codex / OpenAI: install Python package
+    npx harnesses --codex                # Codex / OpenAI: install Python package + plugin
     npx harnesses --dry-run              # Preview Claude install
     npx harnesses --force                # Overwrite existing files
     npx harnesses --install-hooks        # Also install shell hooks
 `);
 }
 
-async function installCodex() {
+function loadMarketplace(path) {
+  if (!existsSync(path)) {
+    return {
+      name: 'harnesses',
+      interface: { displayName: 'Harnesses' },
+      plugins: [],
+    };
+  }
+  return JSON.parse(readFileSync(path, 'utf8'));
+}
+
+function writeMarketplaceEntry(dryRun) {
+  const marketplacePath = join(homedir(), '.agents', 'plugins', 'marketplace.json');
+  assertInsideHome(marketplacePath);
+  if (dryRun) {
+    console.log(`  [write] ~/.agents/plugins/marketplace.json`);
+    return;
+  }
+
+  mkdirSync(dirname(marketplacePath), { recursive: true });
+  const marketplace = loadMarketplace(marketplacePath);
+  marketplace.name ||= 'harnesses';
+  marketplace.interface ||= {};
+  marketplace.interface.displayName ||= 'Harnesses';
+  marketplace.plugins ||= [];
+
+  const entry = {
+    name: 'harnesses',
+    source: {
+      source: 'local',
+      path: './plugins/harnesses',
+    },
+    policy: {
+      installation: 'INSTALLED_BY_DEFAULT',
+      authentication: 'ON_USE',
+    },
+    category: 'Engineering',
+  };
+
+  const index = marketplace.plugins.findIndex((plugin) => plugin.name === 'harnesses');
+  if (index >= 0) marketplace.plugins[index] = entry;
+  else marketplace.plugins.push(entry);
+
+  writeFileSync(marketplacePath, JSON.stringify(marketplace, null, 2) + '\n');
+  console.log(`  marketplace: ~/.agents/plugins/marketplace.json`);
+}
+
+function escapeRegExp(value) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+function setCodexPluginEnabled(dryRun, enabled) {
+  const configPath = join(homedir(), '.codex', 'config.toml');
+  assertInsideHome(configPath);
+
+  const action = enabled ? 'enable' : 'disable';
+  const done = enabled ? 'enabled' : 'disabled';
+
+  if (dryRun) {
+    console.log(`  [write] ~/.codex/config.toml plugin ${action}: ${CODEX_PLUGIN_ID}`);
+    return;
+  }
+
+  if (!existsSync(configPath) && !enabled) return;
+
+  mkdirSync(dirname(configPath), { recursive: true });
+  const header = `[plugins."${CODEX_PLUGIN_ID}"]`;
+  const enabledLine = `enabled = ${enabled ? 'true' : 'false'}`;
+  const rawConfig = existsSync(configPath) ? readFileSync(configPath, 'utf8') : '';
+  const config = rawConfig.length > 0 && !rawConfig.endsWith('\n') ? `${rawConfig}\n` : rawConfig;
+
+  if (!enabled && !config.includes(header)) return;
+
+  const sectionPattern = new RegExp(`(^${escapeRegExp(header)}\\n)([\\s\\S]*?)(?=^\\[|\\s*$)`, 'm');
+  let nextConfig;
+
+  if (sectionPattern.test(config)) {
+    nextConfig = config.replace(sectionPattern, (_match, sectionHeader, body) => {
+      const nextBody = /^enabled\s*=.*$/m.test(body)
+        ? body.replace(/^enabled\s*=.*$/m, enabledLine)
+        : `${enabledLine}\n${body}`;
+      return `${sectionHeader}${nextBody}`;
+    });
+  } else {
+    const separator = config.trim().length > 0 ? '\n' : '';
+    nextConfig = `${config}${separator}${header}\n${enabledLine}\n`;
+  }
+
+  writeFileSync(configPath, nextConfig);
+  console.log(`  codex config: plugin ${done} (${CODEX_PLUGIN_ID})`);
+}
+
+function removeMarketplaceEntry(dryRun) {
+  const marketplacePath = join(homedir(), '.agents', 'plugins', 'marketplace.json');
+  assertInsideHome(marketplacePath);
+  if (dryRun) {
+    console.log(`  [remove] ~/.agents/plugins/marketplace.json entry: harnesses`);
+    return;
+  }
+  if (!existsSync(marketplacePath)) return;
+  const marketplace = loadMarketplace(marketplacePath);
+  marketplace.plugins = (marketplace.plugins || []).filter((plugin) => plugin.name !== 'harnesses');
+  writeFileSync(marketplacePath, JSON.stringify(marketplace, null, 2) + '\n');
+  console.log(`  marketplace removed: harnesses`);
+}
+
+async function installCodexPlugin(dryRun) {
+  if (!existsSync(CODEX_PLUGIN_DIR)) {
+    console.error('  ✗ codex/plugin/harnesses bundle not found.');
+    process.exit(1);
+  }
+
+  const pluginDest = join(homedir(), 'plugins', 'harnesses');
+  assertInsideHome(pluginDest);
+  if (dryRun) {
+    for (const op of collectFiles(CODEX_PLUGIN_DIR, pluginDest)) {
+      console.log(`  [copy] ${op.dest.replace(homedir() + sep, '~/')}`);
+    }
+  } else {
+    mkdirSync(dirname(pluginDest), { recursive: true });
+    rmSync(pluginDest, { recursive: true, force: true });
+    cpSync(CODEX_PLUGIN_DIR, pluginDest, { recursive: true });
+    console.log(`  plugin: ~/plugins/harnesses`);
+  }
+
+  writeMarketplaceEntry(dryRun);
+  setCodexPluginEnabled(dryRun, true);
+
+  const codex = findCommand('codex');
+  if (codex) {
+    if (dryRun) {
+      console.log(`  [run] codex plugin marketplace add ~`);
+    } else {
+      try {
+        await runCommand(codex, ['plugin', 'marketplace', 'add', homedir()]);
+      } catch {
+        console.log('  note: Codex marketplace registration failed; plugin files were installed.');
+        console.log('        Run manually: codex plugin marketplace add ~');
+      }
+    }
+  } else {
+    console.log('  note: codex CLI not found; install Codex and run: codex plugin marketplace add ~');
+  }
+}
+
+async function uninstallCodex(dryRun) {
+  console.log('\n  harnesses — Codex uninstall\n');
+
+  const promptsSrc = join(CODEX_DIR, 'prompts');
+  if (existsSync(promptsSrc)) {
+    for (const entry of readdirSync(promptsSrc, { withFileTypes: true })) {
+      if (!entry.isFile() || !entry.name.endsWith('.md')) continue;
+      const dest = join(homedir(), '.codex', 'prompts', entry.name);
+      assertInsideHome(dest);
+      if (existsSync(dest) || dryRun) {
+        if (!dryRun) unlinkSync(dest);
+        console.log(`${dryRun ? '  [remove]' : '  remove:'} ~/.codex/prompts/${entry.name}`);
+      }
+    }
+  }
+
+  const pluginDest = join(homedir(), 'plugins', 'harnesses');
+  assertInsideHome(pluginDest);
+  if (existsSync(pluginDest) || dryRun) {
+    if (!dryRun) rmSync(pluginDest, { recursive: true, force: true });
+    console.log(`${dryRun ? '  [remove]' : '  remove:'} ~/plugins/harnesses`);
+  }
+
+  removeMarketplaceEntry(dryRun);
+  setCodexPluginEnabled(dryRun, false);
+
+  if (!dryRun) {
+    const uv = findCommand('uv');
+    const pip = findCommand('pip3') || findCommand('pip');
+    try {
+      if (uv) await runCommand('uv', ['tool', 'uninstall', 'codex-harnesses']);
+      else if (pip) await runCommand(pip, ['uninstall', '-y', 'codex-harnesses']);
+    } catch {
+      console.log('  note: codex-harnesses tool uninstall failed or was already absent.');
+    }
+  } else {
+    console.log(`  [run] uv tool uninstall codex-harnesses`);
+  }
+
+  console.log('\n  ✓ Codex uninstall complete\n');
+}
+
+async function installCodex(args) {
+  const dryRun = args.includes('--dry-run');
+  const uninstall = args.includes('--uninstall');
+
+  if (uninstall) {
+    await uninstallCodex(dryRun);
+    return;
+  }
+
   console.log('\n  harnesses — Codex setup\n');
 
   if (!existsSync(CODEX_DIR)) {
@@ -108,7 +317,9 @@ async function installCodex() {
 
   const uv = findCommand('uv');
 
-  if (uv) {
+  if (dryRun) {
+    console.log(`  [run] ${uv ? 'uv tool install --reinstall' : 'pip install --user'} ${CODEX_DIR}`);
+  } else if (uv) {
     console.log('  Using uv tool install...');
     await runCommand('uv', ['tool', 'install', '--reinstall', CODEX_DIR]);
   } else {
@@ -136,13 +347,16 @@ async function installCodex() {
   const promptsSrc = join(CODEX_DIR, 'prompts');
   if (existsSync(promptsSrc)) {
     const codexPromptsDir = join(homedir(), '.codex', 'prompts');
-    mkdirSync(codexPromptsDir, { recursive: true });
     let promptsCopied = 0;
     for (const entry of readdirSync(promptsSrc, { withFileTypes: true })) {
       if (!entry.isFile() || !entry.name.endsWith('.md')) continue;
       const dest = join(codexPromptsDir, entry.name);
-      cpSync(join(promptsSrc, entry.name), dest);
-      console.log(`  prompt: ~/.codex/prompts/${entry.name}`);
+      assertInsideHome(dest);
+      if (!dryRun) {
+        mkdirSync(codexPromptsDir, { recursive: true });
+        cpSync(join(promptsSrc, entry.name), dest);
+      }
+      console.log(`${dryRun ? '  [copy]' : '  prompt:'} ~/.codex/prompts/${entry.name}`);
       promptsCopied++;
     }
     if (promptsCopied > 0) {
@@ -151,9 +365,12 @@ async function installCodex() {
     }
   }
 
+  await installCodexPlugin(dryRun);
+
   console.log('\n  ✓ Done!\n');
   console.log('  CLI:    codex-harnesses "question" --option-a A --option-b B');
-  console.log('  Codex:  /debate "question" --option-a A --option-b B\n');
+  console.log('  Codex:  natural-language routing, or /debate "question" --option-a A --option-b B\n');
+  console.log('  Restart Codex to load the Harnesses plugin in new sessions.\n');
 }
 
 async function installClaude(args) {
@@ -368,7 +585,7 @@ async function main() {
   }
 
   if (isCodexMode) {
-    await installCodex();
+    await installCodex(args);
   } else {
     await installClaude(args);
   }

@@ -28,16 +28,18 @@ Agents and skills are installed to `~/.claude/agents/` and `~/.claude/commands/`
 ### Codex / OpenAI
 
 ```bash
-harnesses --codex          # installs codex-harnesses Python package
+harnesses --codex          # installs codex-harnesses + Codex auto-routing plugin
 ```
 
 Requires Python 3.11+ and `uv` (recommended) or `pip3`. After install:
 
 ```bash
+codex-harnesses route "Redis vs Memcached 결정해줘" --json
+codex-harnesses run "Review this PR for correctness and security"
 codex-harnesses "PostgreSQL vs MongoDB?" --option-a PostgreSQL --option-b MongoDB
 ```
 
-The Codex package currently ships the adversarial debate pipeline only: advocate-a → advocate-b → devil's advocate → judge. Codex agents can read your codebase files to build evidence-backed arguments.
+The Codex package ships native routing for `debate`, `explore`, `review`, and `research` teams. The installed Codex plugin teaches Codex to auto-route natural-language requests such as `Redis vs Memcached 결정해줘` to the right harness, while `/debate` remains available as an explicit slash command.
 
 ## Teams
 
@@ -72,11 +74,11 @@ See [`docs/PATTERNS.md`](docs/PATTERNS.md) for full details.
 
 | Layer | Path | Purpose |
 |-------|------|---------|
-| Core | `core/` | Shared orchestration pattern specs, blackboard schema, and trace schema |
+| Core | `core/` | Shared orchestration pattern specs, routing schema, run state schema, blackboard schema, and trace schema |
 | Claude Code | `claudecode/plugins/` | Claude Code teams, agents, skills, hooks, and harness docs |
 | Codex | `codex/` | Python package that orchestrates Codex CLI workers |
 
-The npm CLI in `bin/install.mjs` is the distribution wrapper: by default it installs the Claude Code layer to `~/.claude/`; with `--codex` it installs the Codex Python package.
+The npm CLI in `bin/install.mjs` is the distribution wrapper: by default it installs the Claude Code layer to `~/.claude/`; with `--codex` it installs the Codex Python package, slash prompts, and auto-routing plugin.
 
 > **Layout note:** Since `1.0.3`, Claude Code plugins live under `claudecode/plugins/` instead of the old root-level `plugins/` directory. Existing installed teams still use the same `~/.claude/` destination paths; only the repository layout changed.
 

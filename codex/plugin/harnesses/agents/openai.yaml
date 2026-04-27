@@ -1,0 +1,4 @@
+interface:
+  display_name: "Harnesses"
+  short_description: "Auto-route Codex tasks to debate, explore, review, and research harness teams."
+  default_prompt: "Use harnesses to route this task to the right multi-agent team and show the saved run id."

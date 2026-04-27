@@ -1,5 +1,19 @@
 # Changelog
 
+## [1.0.4] - 2026-04-27
+
+### Added
+- Codex auto-routing plugin for routing natural-language requests to `debate`, `explore`, `review`, and `research` harness teams.
+- Codex run persistence under `.harness/runs/`, including manifest, trace, and transcript files.
+- Explore, review, and research Codex team definitions, agent instructions, and tests.
+
+### Fixed
+- Disable Codex plugins inside harness worker subprocesses by default so offline plugin marketplace sync failures do not abort runs before an agent can respond.
+- Preserve full worker failure diagnostics with return code plus stderr/stdout snippets.
+- Pass `codex exec` options before the prompt so model and working-directory flags are interpreted correctly.
+
+---
+
 ## [1.0.3] - 2026-04-23
 
 ### Fixed

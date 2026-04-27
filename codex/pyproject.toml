@@ -4,8 +4,8 @@ build-backend = "hatchling.build"
 
 [project]
 name = "codex-harnesses"
-version = "0.1.1"
-description = "Multi-agent orchestration for Codex CLI — debate pipeline"
+version = "0.1.2"
+description = "Codex-native multi-agent orchestration with routing, teams, and saved runs"
 requires-python = ">=3.11"
 license = { text = "MIT" }
 authors = [{ name = "justn-hyeok" }]
@@ -16,7 +16,7 @@ dependencies = [
 ]
 
 [project.scripts]
-codex-harnesses = "codex_harnesses.cli:app"
+codex-harnesses = "codex_harnesses.cli:main"
 
 [project.optional-dependencies]
 dev = [
@@ -31,7 +31,7 @@ packages = ["src/codex_harnesses"]
 "src" = ""
 
 [tool.hatch.build.targets.wheel.force-include]
-"agents/debate" = "codex_harnesses/agents/debate"
+"agents" = "codex_harnesses/agents"
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"

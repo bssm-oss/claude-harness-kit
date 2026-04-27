@@ -28,16 +28,18 @@ harnesses be-team fe-team  # 특정 팀만 선택
 ### Codex / OpenAI
 
 ```bash
-harnesses --codex          # codex-harnesses Python 패키지 설치
+harnesses --codex          # codex-harnesses + Codex 자동 라우팅 플러그인 설치
 ```
 
 Python 3.11+와 `uv`(권장) 또는 `pip3` 필요. 설치 후:
 
 ```bash
+codex-harnesses route "Redis vs Memcached 결정해줘" --json
+codex-harnesses run "이 PR correctness/security 리뷰해줘"
 codex-harnesses "PostgreSQL vs MongoDB?" --option-a PostgreSQL --option-b MongoDB
 ```
 
-Codex 패키지는 현재 적대적 토론 파이프라인만 제공합니다: advocate-a → advocate-b → devil's advocate → judge. Codex 에이전트가 코드베이스 파일을 직접 읽어 증거 기반 논거를 구성합니다.
+Codex 패키지는 `debate`, `explore`, `review`, `research` 팀 라우팅을 제공합니다. 설치되는 Codex 플러그인은 `Redis vs Memcached 결정해줘` 같은 자연어 요청을 적절한 하네스로 자동 라우팅하도록 Codex에 알려주며, `/debate` 슬래시 명령도 명시적 호출용으로 계속 사용할 수 있습니다.
 
 ## 팀 구성
 
@@ -72,11 +74,11 @@ Cross-cutting: Reflection Loop, Circuit Breaker, Escalation, Consensus Voting.
 
 | 레이어 | 경로 | 역할 |
 |--------|------|------|
-| Core | `core/` | 공통 오케스트레이션 패턴 스펙, blackboard schema, trace schema |
+| Core | `core/` | 공통 오케스트레이션 패턴 스펙, routing schema, run state schema, blackboard schema, trace schema |
 | Claude Code | `claudecode/plugins/` | Claude Code 팀, 에이전트, 스킬, 훅, 하네스 문서 |
 | Codex | `codex/` | Codex CLI worker를 오케스트레이션하는 Python 패키지 |
 
-`bin/install.mjs`의 npm CLI는 배포 래퍼입니다. 기본값은 Claude Code 레이어를 `~/.claude/`에 설치하고, `--codex`를 주면 Codex Python 패키지를 설치합니다.
+`bin/install.mjs`의 npm CLI는 배포 래퍼입니다. 기본값은 Claude Code 레이어를 `~/.claude/`에 설치하고, `--codex`를 주면 Codex Python 패키지, 슬래시 프롬프트, 자동 라우팅 플러그인을 설치합니다.
 
 > **레이아웃 참고:** `1.0.3`부터 Claude Code 플러그인은 기존 루트 `plugins/`가 아니라 `claudecode/plugins/` 아래에 있습니다. 이미 설치된 팀의 `~/.claude/` 대상 경로는 그대로이며, 저장소 내부 구조만 바뀌었습니다.
 

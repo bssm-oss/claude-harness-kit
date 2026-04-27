@@ -1,0 +1,42 @@
+{
+  "name": "harnesses",
+  "version": "0.1.0",
+  "description": "Codex-native routing for harnesses multi-agent teams: debate, explore, review, and research.",
+  "author": {
+    "name": "justn-hyeok"
+  },
+  "homepage": "https://github.com/bssm-oss/harnesses",
+  "repository": "https://github.com/bssm-oss/harnesses",
+  "license": "MIT",
+  "keywords": [
+    "codex",
+    "multi-agent",
+    "routing",
+    "debate",
+    "review",
+    "research"
+  ],
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "Harnesses",
+    "shortDescription": "Auto-route Codex tasks to multi-agent harness teams",
+    "longDescription": "Use Harnesses when a Codex task should run through a structured team such as debate, explore, review, or research, with saved traces and transcripts.",
+    "developerName": "justn-hyeok",
+    "category": "Engineering",
+    "capabilities": [
+      "Read",
+      "Write",
+      "Interactive"
+    ],
+    "websiteURL": "https://github.com/bssm-oss/harnesses",
+    "privacyPolicyURL": "https://github.com/bssm-oss/harnesses",
+    "termsOfServiceURL": "https://github.com/bssm-oss/harnesses",
+    "defaultPrompt": [
+      "Redis vs Memcached 결정해줘",
+      "Investigate this bug and recommend a direction",
+      "Review this change for correctness and security"
+    ],
+    "brandColor": "#2563EB",
+    "screenshots": []
+  }
+}
